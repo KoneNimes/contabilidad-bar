@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date, timedelta
@@ -10,27 +11,26 @@ st.title("📊 Contabilidad del Bar")
 if 'datos' not in st.session_state:
     st.session_state.datos = pd.DataFrame(columns=["Fecha", "Tipo", "Categoría", "Método", "Concepto", "Monto (€)"])
 
-# Categorías predefinidas
 CATEGORIAS_INGRESO = ["Caja del día", "Ventas Eventos", "Otros Ingresos"]
 CATEGORIAS_GASTO = ["Proveedores (Bebidas/Comida)", "Suministros (Luz, Agua, Gas)", "Alquiler", "Personal / Salarios", "Mantenimiento / Impuestos", "Otros Gastos"]
 METODOS_PAGO = ["Efectivo", "Banco / Tarjeta"]
 
 # --- FORMULARIO DE REGISTRO ---
 st.subheader("Registrar Movimiento")
-with st.form("formulario_contable", clear_on_submit=True):
+with st.form(key="form_unico_contable", clear_on_submit=True):
     col_f1, col_f2 = st.columns(2)
     with col_f1:
-        fecha = st.date_input("Fecha", datetime.today())
-        tipo = st.selectbox("Tipo de Movimiento", ["Ingreso", "Gasto"])
+        fecha = st.date_input("Fecha", datetime.today(), key="f_fecha")
+        tipo = st.selectbox("Tipo de Movimiento", ["Ingreso", "Gasto"], key="f_tipo")
     with col_f2:
-        metodo = st.selectbox("Método / Cuenta", METODOS_PAGO)
+        metodo = st.selectbox("Método / Cuenta", METODOS_PAGO, key="f_metodo")
         if tipo == "Ingreso":
-            categoria = st.selectbox("Categoría", CATEGORIAS_INGRESO)
+            categoria = st.selectbox("Categoría", CATEGORIAS_INGRESO, key="f_cat_ingr")
         else:
-            categoria = st.selectbox("Categoría", CATEGORIAS_GASTO)
+            categoria = st.selectbox("Categoría", CATEGORIAS_GASTO, key="f_cat_gast")
 
-    concepto = st.text_input("Concepto (ej. Factura Mahou, Panadería, Caja Noche)")
-    monto = st.number_input("Monto (€)", min_value=0.0, step=0.5, format="%.2f")
+    concepto = st.text_input("Concepto (ej. Factura Mahou, Panadería, Caja Noche)", key="f_concepto")
+    monto = st.number_input("Monto (€)", min_value=0.0, step=0.5, format="%.2f", key="f_monto")
     
     guardar = st.form_submit_button("Guardar Registro")
 
@@ -49,21 +49,21 @@ if guardar:
     else:
         st.warning("⚠️ Ingresa un concepto y un monto mayor a cero.")
 
-# --- FILTROS DE FECHA ---
+# --- FILTROS DE FECHA Y RESUMEN ---
 st.divider()
 st.subheader("📈 Resumen Financiero")
 
 df = st.session_state.datos
 
 if not df.empty:
-    # Convertir columna Fecha a datetime para filtrar fácilmente
     df['Fecha_dt'] = pd.to_datetime(df['Fecha']).dt.date
     hoy = date.today()
 
     filtro_tiempo = st.radio(
         "Ver datos de:",
         ["Hoy", "Esta Semana", "Este Mes", "Todo"],
-        horizontal=True
+        horizontal=True,
+        key="f_radio_periodo"
     )
 
     if filtro_tiempo == "Hoy":
@@ -81,7 +81,6 @@ if not df.empty:
         total_gastos = df_filtrado[df_filtrado["Tipo"] == "Gasto"]["Monto (€)"].sum()
         beneficio = total_ingresos - total_gastos
 
-        # Totales por método de pago
         efectivo_ingr = df_filtrado[(df_filtrado["Tipo"] == "Ingreso") & (df_filtrado["Método"] == "Efectivo")]["Monto (€)"].sum()
         efectivo_gast = df_filtrado[(df_filtrado["Tipo"] == "Gasto") & (df_filtrado["Método"] == "Efectivo")]["Monto (€)"].sum()
         saldo_efectivo = efectivo_ingr - efectivo_gast
@@ -90,13 +89,11 @@ if not df.empty:
         banco_gast = df_filtrado[(df_filtrado["Tipo"] == "Gasto") & (df_filtrado["Método"] == "Banco / Tarjeta")]["Monto (€)"].sum()
         saldo_banco = banco_ingr - banco_gast
 
-        # Métricas generales
         c1, c2, c3 = st.columns(3)
         c1.metric("Ingresos Totales", f"{total_ingresos:.2f} €")
         c2.metric("Gastos Totales", f"{total_gastos:.2f} €")
         c3.metric("Beneficio Neto", f"{beneficio:.2f} €")
 
-        # Saldo por Caja vs Banco
         st.markdown("#### 💵 Desglose por Caja / Banco")
         cb1, cb2 = st.columns(2)
         cb1.metric("Saldo en Efectivo (Caja)", f"{saldo_efectivo:.2f} €")
@@ -109,57 +106,3 @@ if not df.empty:
         st.info("No hay registros para el período seleccionado.")
 else:
     st.info("Aún no hay movimientos registrados.")
-import streamlit as st
-import pandas as pd
-from datetime import datetime
-
-st.set_page_config(page_title="Gestión Contable Bar", layout="centered")
-
-st.title("📊 Contabilidad del Bar")
-
-# Inicializar datos en sesión si no existen
-if 'datos' not in st.session_state:
-    st.session_state.datos = pd.DataFrame(columns=["Fecha", "Tipo", "Concepto", "Monto (€)"])
-
-# Formulario de registro
-st.subheader("Registrar Movimiento")
-with st.form("formulario_contable", clear_on_submit=True):
-    fecha = st.date_input("Fecha", datetime.today())
-    tipo = st.selectbox("Tipo de Movimiento", ["Ingreso", "Gasto"])
-    concepto = st.text_input("Concepto (ej. Caja del día, Proveedores, Bebidas)")
-    monto = st.number_input("Monto (€)", min_value=0.0, step=0.5, format="%.2f")
-    
-    guardar = st.form_submit_button("Guardar Registro")
-
-if guardar:
-    if concepto.strip() != "" and monto > 0:
-        nuevo_registro = pd.DataFrame([{
-            "Fecha": fecha.strftime("%Y-%m-%d"),
-            "Tipo": tipo,
-            "Concepto": concepto,
-            "Monto (€)": monto
-        }])
-        st.session_state.datos = pd.concat([st.session_state.datos, nuevo_registro], ignore_index=True)
-        st.success("✅ Registro guardado correctamente.")
-    else:
-        st.warning("⚠️ Ingresa un concepto y un monto mayor a cero.")
-
-# Resumen financiero
-st.divider()
-st.subheader("📈 Resumen")
-
-df = st.session_state.datos
-if not df.empty:
-    total_ingresos = df[df["Tipo"] == "Ingreso"]["Monto (€)"].sum()
-    total_gastos = df[df["Tipo"] == "Gasto"]["Monto (€)"].sum()
-    beneficio = total_ingresos - total_gastos
-
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Ingresos", f"{total_ingresos:.2f} €")
-    col2.metric("Gastos", f"{total_gastos:.2f} €")
-    col3.metric("Beneficio", f"{beneficio:.2f} €")
-
-    st.subheader("📋 Historial de Registros")
-    st.dataframe(df, use_container_width=True)
-else:
-    st.info("Aún no hay movimientos registrados hoy.")
